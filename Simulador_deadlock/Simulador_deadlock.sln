@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35122.118
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simulador_deadlock", "Simulador_deadlock.csproj", "{56F13239-4D97-495F-9190-1185D90D642A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{56F13239-4D97-495F-9190-1185D90D642A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56F13239-4D97-495F-9190-1185D90D642A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56F13239-4D97-495F-9190-1185D90D642A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56F13239-4D97-495F-9190-1185D90D642A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F0917D72-3586-4025-9FA5-7599135D1FCE}
+	EndGlobalSection
+EndGlobal
