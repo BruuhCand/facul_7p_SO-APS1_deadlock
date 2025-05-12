@@ -1,55 +1,56 @@
-﻿using System.Reflection.Metadata.Ecma335;
+﻿using Simulador_deadlock;
 using System.Threading;
 
-namespace Simulador_deadlock
+namespace SimuladorDeadlock
 {
     class Program
     {
         static List<Processo> processos = new();
         static Dictionary<string, object> recursos = new();
-        static object lockObj = new();
-        static CancellationTokenSource cancellationTokenSource = new();
+        static object sincronizador = new();
+        static CancellationTokenSource cancelador = new();
 
         static void Main()
         {
+            
             recursos["R1"] = new object();
             recursos["R2"] = new object();
             recursos["R3"] = new object();
 
+            
             processos.Add(new Processo("P1", new[] { "R1", "R2" }));
             processos.Add(new Processo("P2", new[] { "R2", "R3" }));
             processos.Add(new Processo("P3", new[] { "R3", "R1" }));
 
-            foreach (var p in processos)
+            
+            foreach (var processo in processos)
             {
-                var thread = new Thread(() => ExecutarProcesso(p, cancellationTokenSource.Token));
-                p.Thread = thread;
+                var thread = new Thread(() => ExecutarProcesso(processo, cancelador.Token));
+                processo.Thread = thread;
                 thread.Start();
             }
 
+            
             while (true)
             {
                 Thread.Sleep(5000);
-                DetectarETratarDeadlock();
+                VerificarDeadlock();
             }
         }
 
-        static void ExecutarProcesso(Processo p, CancellationToken cancellationToken)
+        static void ExecutarProcesso(Processo processo, CancellationToken token)
         {
             try
             {
-                foreach (var recurso in p.RecursosNecessarios)
+                foreach (var recurso in processo.RecursosNecessarios)
                 {
-                    bool cancelar = false;
+                    if (VerificarCancelamento(processo, token.IsCancellationRequested)) return;
 
-                    if (CancelamentoRequerido(p, cancellationToken.IsCancellationRequested))
-                        return;
-
-                    lock (lockObj)
+                    lock (sincronizador)
                     {
-                        p.Estado = $"Esperando {recurso}";
-                        p.RecursoAtual = recurso;
-                        Console.WriteLine($"{p.Nome} está esperando recurso {recurso}");
+                        processo.Estado = $"Esperando pelo recurso {recurso}";
+                        processo.RecursoAtual = recurso;
+                        Console.WriteLine($"{processo.Nome} está aguardando o recurso {recurso}...");
                     }
 
                     Thread.Sleep(3000); 
@@ -57,45 +58,39 @@ namespace Simulador_deadlock
                     
                     lock (recursos[recurso])
                     {
+                        if (VerificarCancelamento(processo, token.IsCancellationRequested)) return;
 
-                        if (CancelamentoRequerido(p, cancellationToken.IsCancellationRequested))
-                            return;
-
-                        lock (lockObj)
+                        lock (sincronizador)
                         {
-                            p.Estado = $"Usando {recurso}";
-                            Console.WriteLine($"{p.Nome} está usando recurso {recurso}");
+                            processo.Estado = $"Utilizando o recurso {recurso}";
+                            Console.WriteLine($"{processo.Nome} está utilizando o recurso {recurso}");
                         }
 
                         Thread.Sleep(5000);
-
-
-                        if (CancelamentoRequerido(p, cancellationToken.IsCancellationRequested))
-                            return;
                     }
                 }
 
-                lock (lockObj)
+                lock (sincronizador)
                 {
-                    p.Estado = "Finalizado";
-                    p.Finalizado = true;
-                    Console.WriteLine($"{p.Nome} finalizou.");
+                    processo.Estado = "Finalizado";
+                    processo.Finalizado = true;
+                    Console.WriteLine($"{processo.Nome} finalizou.");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro no processo {p.Nome}: {ex.Message}");
+                Console.WriteLine($"Erro durante a execução de {processo.Nome}: {ex.Message}");
             }
         }
 
-        static bool CancelamentoRequerido(Processo p, bool cancelamento)
+        static bool VerificarCancelamento(Processo processo, bool foiCancelado)
         {
-            if (cancelamento)
+            if (foiCancelado)
             {
-                lock (lockObj)
+                lock (sincronizador)
                 {
-                    p.Estado = "Abortado";
-                    Console.WriteLine($"{p.Nome} abortado após usar {p.RecursoAtual}.");
+                    processo.Estado = "Abortado";
+                    Console.WriteLine($"{processo.Nome} foi interrompido");
                     return true;
                 }
             }
@@ -103,34 +98,36 @@ namespace Simulador_deadlock
             return false;
         }
 
-        static void DetectarETratarDeadlock()
+        static void VerificarDeadlock()
         {
-            lock (lockObj)
+            lock (sincronizador)
             {
-                var bloqueados = processos
+                var emEspera = processos
                     .Where(p => !p.Finalizado && p.Estado.StartsWith("Esperando"))
                     .ToList();
 
-                if (bloqueados.Count >= 3 && IsDeadlock(bloqueados))
+                if (emEspera.Count >= 3 && ExisteCicloDeEspera(emEspera))
                 {
-                    Console.WriteLine("\nDEADLOCK DETECTADO!");
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("\nDeadlock detectado!");
+                    Console.ResetColor();
 
-                    cancellationTokenSource.Cancel(); 
+                    cancelador.Cancel();
 
-                    foreach (var p in bloqueados)
+                    foreach (var p in emEspera)
                     {
-                        Console.WriteLine($"Matando processo {p.Nome} que estava em: {p.Estado}");
+                        Console.WriteLine($"Cancelando {p.Nome}, pois estava em: {p.Estado}");
                     }
 
-                    Console.WriteLine();
+                    Console.WriteLine("A execução será encerrada para os processos em conflito.\n");
                 }
             }
         }
 
-        static bool IsDeadlock(List<Processo> bloqueados)
+        static bool ExisteCicloDeEspera(List<Processo> processosTravados)
         {
-            var recursosBloqueados = bloqueados.Select(p => p.RecursoAtual).Distinct();
-            return recursosBloqueados.Count() <= bloqueados.Count;
+            var recursosAguardados = processosTravados.Select(p => p.RecursoAtual).Distinct();
+            return recursosAguardados.Count() <= processosTravados.Count;
         }
     }
 }
