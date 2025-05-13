@@ -1,4 +1,5 @@
 ﻿using Simulador_deadlock;
+using System.ComponentModel.DataAnnotations;
 using System.Threading;
 
 namespace SimuladorDeadlock
@@ -6,68 +7,86 @@ namespace SimuladorDeadlock
     class Program
     {
         static List<Processo> processos = new();
-        static Dictionary<string, object> recursos = new();
+       // static Dictionary<string, object> recursos = new();
         static object sincronizador = new();
-        static CancellationTokenSource cancelador = new();
-
+        //static bool cancelador = false;
+        static List<Recurso> recursos = new();
+        static List<Processo> deadlock = new();
+        static bool deadLockDetectado = false;
         static void Main()
         {
-            
-            recursos["R1"] = new object();
-            recursos["R2"] = new object();
-            recursos["R3"] = new object();
 
-            
-            processos.Add(new Processo("P1", new[] { "R1", "R2" }));
+            recursos.Add(new Recurso("R1"));
+            recursos.Add(new Recurso("R2"));
+            recursos.Add(new Recurso("R3"));
+            recursos.Add(new Recurso("R4"));
+            recursos.Add(new Recurso("R5"));
+            recursos.Add(new Recurso("R6"));
+
+
+
+            processos.Add(new Processo("P1", new[] { "R4", "R2" }));
             processos.Add(new Processo("P2", new[] { "R2", "R3" }));
             processos.Add(new Processo("P3", new[] { "R3", "R1" }));
+            processos.Add(new Processo("P4", new[] { "R1", "R2" }));
+            processos.Add(new Processo("P5", new[] { "R6", "R3" }));
 
-            
             foreach (var processo in processos)
             {
-                var thread = new Thread(() => ExecutarProcesso(processo, cancelador.Token));
+                var thread = new Thread(() => ExecutarProcesso(processo));
                 processo.Thread = thread;
                 thread.Start();
+               // Thread.Sleep(100);
             }
 
             
             while (true)
             {
-                Thread.Sleep(5000);
+                Thread.Sleep(2000);
                 VerificarDeadlock();
             }
         }
 
-        static void ExecutarProcesso(Processo processo, CancellationToken token)
+        static void ExecutarProcesso(Processo processo)
         {
             try
             {
-                foreach (var recurso in processo.RecursosNecessarios)
+                foreach (var r in processo.RecursosNecessarios)
                 {
-                    if (VerificarCancelamento(processo, token.IsCancellationRequested)) return;
+                    if (VerificarCancelamento(processo, processo.cancelar)) return;
 
                     lock (sincronizador)
                     {
-                        processo.Estado = $"Esperando pelo recurso {recurso}";
-                        processo.RecursoAtual = recurso;
-                        Console.WriteLine($"{processo.Nome} está aguardando o recurso {recurso}...");
+                        processo.Estado = $"Esperando pelo recurso {r}";
+                        processo.RecursoEsperado = r;
+                        Console.WriteLine($"{processo.Nome} está aguardando o recurso {r}...");
                     }
 
-                    Thread.Sleep(3000); 
-
-                    
-                    lock (recursos[recurso])
+                    Thread.Sleep(3000);
+                    var recursoUsado = recursos.Find(rec => rec.Nome.Equals(processo.RecursoAtual));
+                    if (recursoUsado != null) 
                     {
-                        if (VerificarCancelamento(processo, token.IsCancellationRequested)) return;
+                        recursoUsado.EmUso = false;
+                    }
+                    var recurso = recursos.Find(rec => rec.Nome.Equals(r));
+                    lock (recurso.Lock)
+                    {
+                        if (VerificarCancelamento(processo, processo.cancelar)) return;
 
                         lock (sincronizador)
                         {
-                            processo.Estado = $"Utilizando o recurso {recurso}";
-                            Console.WriteLine($"{processo.Nome} está utilizando o recurso {recurso}");
+                            processo.RecursoEsperado = null;
+                            recurso.EmUso = true;
+                            processo.Estado = $"Utilizando o recurso {r}";
+                            processo.RecursoAtual = r;
+                            Console.WriteLine($"{processo.Nome} está utilizando o recurso {r}");
                         }
 
-                        Thread.Sleep(5000);
+                        Thread.Sleep(10000);
+                        
                     }
+
+                   
                 }
 
                 lock (sincronizador)
@@ -85,49 +104,78 @@ namespace SimuladorDeadlock
 
         static bool VerificarCancelamento(Processo processo, bool foiCancelado)
         {
-            if (foiCancelado)
+            if (foiCancelado && deadlock.Contains(processo))
             {
                 lock (sincronizador)
                 {
-                    processo.Estado = "Abortado";
-                    Console.WriteLine($"{processo.Nome} foi interrompido");
-                    return true;
+                   
+                      processo.Estado = "Abortado";
+                     Console.WriteLine($"{processo.Nome} foi interrompido");
+                    deadlock.Remove(processo);
+                     return true;
+                    
+
                 }
             }
+
 
             return false;
         }
 
         static void VerificarDeadlock()
         {
-            lock (sincronizador)
+            if (!deadLockDetectado)
             {
-                var emEspera = processos
-                    .Where(p => !p.Finalizado && p.Estado.StartsWith("Esperando"))
-                    .ToList();
-
-                if (emEspera.Count >= 3 && ExisteCicloDeEspera(emEspera))
+                lock (sincronizador)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("\nDeadlock detectado!");
-                    Console.ResetColor();
+                    var recursosUsados = recursos.Where(x => x.EmUso == true).ToList();
 
-                    cancelador.Cancel();
+                    var emEspera = processos
+                        .Where(p => !p.Finalizado && p.Estado.StartsWith("Esperando"))
+                        .ToList();
 
-                    foreach (var p in emEspera)
+                    var processosFiltrados = ExisteCicloDeEspera(ExisteNaLista(emEspera), emEspera);
+
+
+                    if (processosFiltrados.Any())
                     {
-                        Console.WriteLine($"Cancelando {p.Nome}, pois estava em: {p.Estado}");
-                    }
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("\nDeadlock detectado!");
+                        Console.ResetColor();
 
-                    Console.WriteLine("A execução será encerrada para os processos em conflito.\n");
+                        //cancelador.Cancel();
+                        deadLockDetectado = true;
+
+
+                        deadlock.Clear();
+                        foreach (var i in processosFiltrados)
+                        {
+                            i.cancelar = true;
+                            deadlock.Add(i);
+                            Console.WriteLine($"Cancelando {i.Nome}, pois estava em: {i.Estado}");
+                        }
+
+
+                        Console.WriteLine("A execução será encerrada para os processos em conflito.\n");
+                    }
                 }
             }
+          
         }
 
-        static bool ExisteCicloDeEspera(List<Processo> processosTravados)
+        static List<String> ExisteNaLista(List<Processo> processosTravados)
         {
-            var recursosAguardados = processosTravados.Select(p => p.RecursoAtual).Distinct();
-            return recursosAguardados.Count() <= processosTravados.Count;
+            var recursosAguardados = processosTravados.Select(p => p.RecursoEsperado).Distinct().ToList();
+            var usando = processos.Select(p => p.RecursoAtual ).Distinct().ToList();
+
+            return recursosAguardados.Intersect(usando).ToList(); 
+        }
+
+        static List<Processo> ExisteCicloDeEspera(List<String> recursosAguardando, List<Processo> processos)
+        {
+            return  processos
+            .Where(p => recursosAguardando.Contains(p.RecursoEsperado) && p.RecursoAtual != p.RecursoEsperado)
+            .ToList();
         }
     }
 }

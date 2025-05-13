@@ -11,10 +11,13 @@ namespace Simulador_deadlock
         public string Nome { get; }
         public string[] RecursosNecessarios { get; }
         public string Estado { get; set; }
-        public string? RecursoAtual { get; set; }
+        public string? RecursoEsperado { get; set; }
+
+        public string? RecursoAtual { get; set; } = null;
         public bool Finalizado { get; set; } = false;
         public Thread? Thread { get; set; }
 
+        public bool cancelar { get; set; } = false;
         public Processo(string nome, string[] recursos)
         {
             Nome = nome;
