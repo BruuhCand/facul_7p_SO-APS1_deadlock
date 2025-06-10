@@ -25,18 +25,18 @@ namespace SimuladorDeadlock
 
 
 
-            processos.Add(new Processo("P1", new[] { "R4", "R2" }));
-            processos.Add(new Processo("P2", new[] { "R2", "R3" }));
-            processos.Add(new Processo("P3", new[] { "R3", "R1" }));
-            processos.Add(new Processo("P4", new[] { "R1", "R2" }));
-            processos.Add(new Processo("P5", new[] { "R6", "R3" }));
+            processos.Add(new Processo("P1", new[] { "R6", "R2" }));
+            processos.Add(new Processo("P2", new[] { "R3", "R3" }));
+            processos.Add(new Processo("P3", new[] { "R1", "R2" }));
+            processos.Add(new Processo("P4", new[] { "R2", "R4" }));
+            processos.Add(new Processo("P5", new[] { "R4", "R1" }));
 
             foreach (var processo in processos)
             {
                 var thread = new Thread(() => ExecutarProcesso(processo));
                 processo.Thread = thread;
                 thread.Start();
-               // Thread.Sleep(100);
+                Thread.Sleep(100);
             }
 
             
@@ -109,8 +109,9 @@ namespace SimuladorDeadlock
                 lock (sincronizador)
                 {
                    
-                      processo.Estado = "Abortado";
-                     Console.WriteLine($"{processo.Nome} foi interrompido");
+                    processo.Estado = "Abortado";
+                    Console.WriteLine($"{processo.Nome} foi interrompido");
+                    //processo.Thread.Abort();
                     deadlock.Remove(processo);
                      return true;
                     
@@ -173,9 +174,12 @@ namespace SimuladorDeadlock
 
         static List<Processo> ExisteCicloDeEspera(List<String> recursosAguardando, List<Processo> processos)
         {
-            return  processos
-            .Where(p => recursosAguardando.Contains(p.RecursoEsperado) && p.RecursoAtual != p.RecursoEsperado)
+            //verifica quais desses recursosaguardando possui na lista dos processos que estão em espera
+            var processoEspera = processos
+            .Where(p => recursosAguardando.Contains(p.RecursoEsperado) && p.RecursoAtual != p.RecursoEsperado && recursosAguardando.Contains(p.RecursoAtual))
             .ToList();
+
+            return processoEspera;
         }
     }
 }
