@@ -8,26 +8,27 @@ namespace Simulador_deadlock
 {
     public class Desfragmentador
     {
-        public void Iniciar(CancellationToken token)
+        public void Iniciar()
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Desfragmentação iniciada...");
-            Console.ResetColor();
+            int numThreads = Environment.ProcessorCount; // 100% de todos os núcleos
+            Console.WriteLine($"Usando {numThreads} threads para simular desfragmentação...");
 
-            while (!token.IsCancellationRequested)
+            for (int i = 0; i < numThreads; i++)
             {
-                for (int i = 0; i < 10_000_000; i++)
+                var thread = new Thread(() =>
                 {
-                    double r = Math.Sqrt(i) * Math.Sin(i); // Simula CPU-bound
-                }
+                    while (true)
+                    {
+                        double x = 0;
+                        for (int j = 0; j < 100_000_000; j++)
+                        {
+                            x += Math.Sqrt(j) * Math.Sin(j); // CPU-bound
+                        }
+                    }
+                });
 
-                Console.WriteLine("Desfragmentando...");
-                Thread.Sleep(1000); // Mantém fluidez no terminal
+                thread.IsBackground = true; // garante que encerram com a aplicação
+                thread.Start();
             }
-
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Desfragmentação encerrada.");
-            Console.ResetColor();
         }
     }
-}
