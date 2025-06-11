@@ -20,7 +20,7 @@ namespace SimuladorDeadlock
 
             // Inicia thread da desfragmentação
             var desfragmentador = new Desfragmentador();
-            var threadDesfrag = new Thread(() => desfragmentador.Iniciar(tokenSource.Token));
+            var threadDesfrag = new Thread(() => desfragmentador.Iniciar());
             threadDesfrag.Start();
 
             recursos.Add(new Recurso("R1"));
