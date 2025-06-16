@@ -17,12 +17,16 @@ namespace Simulador_deadlock
             {
                 var thread = new Thread(() =>
                 {
+
+                    List<double> bloco = new List<double>();
                     while (true)
                     {
                         double x = 0;
                         for (int j = 0; j < 100_000_000; j++)
                         {
                             x += Math.Sqrt(j) * Math.Sin(j); // CPU-bound
+                            bloco.Add(x);
+                            bloco.Sort();
                         }
                     }
                 });
